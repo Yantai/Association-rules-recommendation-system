@@ -100,3 +100,43 @@ rulesLowptratio<-subset(rules,subset= rhs %in% "ptratio=Low-ptratio" & lift>1.2)
 rulesLowptratio
 
 inspect(head(sort(rulesLowptratio, by="confidence"),n=5))
+
+# regression model
+
+load("boston.Rdata")
+boston<-boston[,-14]
+set.seed(1)
+training<-sample(1:nrow(boston),0.8*nrow(boston))
+train<-boston[training,]
+test<-boston[-training,]
+y.test<-test$ptratio
+test<-test[,-11]
+
+train.fit.ols<-lm(ptratio~.,data=train)
+y.test.pre.ols<-predict(train.fit.ols,test )
+error.ols.test<-mean((y.test.pre.ols-y.test)^2)
+error.ols.test # 2.750956
+
+library(glmnet)
+x<-as.matrix(train[,-11])
+y<-train$ptratio
+z<-as.matrix(test)
+train.fit.lasso<-glmnet(x,y,alpha=1)
+cv.out<-cv.glmnet(x,y,alpha=1)
+bestlambda.lasso<-cv.out$lambda.min
+bestlambda.lasso #  0.001713947
+y.test.pre.lasso<-predict(train.fit.lasso,s=bestlambda.lasso,newx=z,type="response")
+error.lasso.test<-mean((y.test.pre.lasso-y.test)^2)
+error.lasso.test #2.746526
+coef.lasso<-predict(train.fit.lasso,s=bestlambda.lasso,type="coefficients")
+
+r<-names(test)[summary(coef.lasso)$i-1]
+c<-summary(coef.lasso)$x[-1]
+lasso.model<-data.frame(r,c)
+lasso.model
+
+quartz()
+barplot(c, width = 1, names.arg =r , beside = T,
+        col = c(1:12),  ylab = "value ",ylim=c(-10,10),main="lasso model coefficient")
+
+
